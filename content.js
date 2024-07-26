@@ -193,6 +193,7 @@ function showExitTime() {
                  .x-lg-text {
                      font-size: 40px;
                      font-family: Proxima Nova !important;
+                     color: #343434;
                  }
  
                  .x-md-text {
@@ -213,7 +214,7 @@ function showExitTime() {
                     align-items: start;
                     flex-direction: column;
                     margin: 0 0 0 30px;
-                                }
+                 }
  
                  .x-title {
                      font-size: 14px !important;
