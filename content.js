@@ -1,7 +1,46 @@
+if (!String.prototype.format) {
+    String.prototype.format = function() {
+      var args = arguments;
+      return this.replace(/{(\d+)}/g, function(match, number) { 
+        return typeof args[number] != 'undefined'
+          ? args[number]
+          : match
+        ;
+      });
+    };
+  }
+
+function nearestMultipleOf15(num) {
+    // Calcola il multiplo di 15 più vicino
+    let lowerMultiple = Math.floor(num / 15) * 15;
+    let upperMultiple = Math.ceil(num / 15) * 15;
+
+    if (lowerMultiple == 0) {
+        lowerMultiple = upperMultiple;
+    }
+
+    // Restituisce il multiplo più vicino
+    return (num - lowerMultiple < upperMultiple - num) ? lowerMultiple : upperMultiple;
+}
+
 function getExitTime() {
+    let messages = [];
     let mainTable = document.querySelector(`table[id$='_grid_timbrus']`);
 
     if (mainTable) {
+        let isItalian = document.querySelector(`[id$='_Visualizzazionetimbrature_11_portlet_title_lbl_title_openclosetbl']`).innerText === 'Visualizzazione timbrature';
+
+        let resLessThan30Min = isItalian ? 'Hai fatto {0} minuti di pausa pranzo.' : `You had a {0} minutes lunch break.`;
+        let ressMoreThan1Hour = isItalian ? 'Hai fatto {0} minuti di pausa pranzo! Orario di uscita calcolato su 60 minuti di pausa ma saranno conteggiati {1} minuti di minor presenza.' :
+            `You had a {0} minutes lunch break! Time of exit calculated on 60 minutes of lunch break but there will be {1} minutes of lower attendance.`;
+        let resROL = isItalian ? `L'orario di uscita è calcolato su {0} ore di ROL.` : 
+            `Time of exit calculated on {0} hours of ROL.`;
+        let resLunchBreak = isItalian ? `L'orario di uscita è calcolato su {0} minuti di pausa pranzo.` :
+            `Time of exit calculated on {0} minutes of lunch break.`;
+        let resIsEstimation = isItalian ? `L'orario di uscita definitivo verrà mostrato dopo la pausa pranzo.` :
+            `The final time of exit will be shown after the lunch break.`
+        let resBefore730 = isItalian ? `L'orario di ingresso usato per il calcolo è 7:30.` :
+            `The time of entry used for the calculation is 7:30.`;
         var timbrature = Array.from(mainTable.querySelectorAll('tbody>tr[lookupcells="1"]')).map((x) => { 
             var time = x.querySelectorAll(':nth-child(3)')[0].innerText;
             var date = new Date();
@@ -32,8 +71,15 @@ function getExitTime() {
             //Cerca la data di inizio
             do {
                 if (timbrature[i].direction === 'IN') {
+
                     // Se ho timbrato prima delle 7:30, imposto 7:30 come orario base
-                    startTime = (timbrature[i].time < minDate) ? minDate : timbrature[i].time;
+                    if (timbrature[i].time < minDate) {
+                        messages.push({ icon: 'warn', message: resBefore730 });
+                        startTime = minDate;
+                    } else {
+                        startTime = timbrature[i].time;
+                    }
+                    
                     found = true;
                 } else {
                     i++;
@@ -67,13 +113,14 @@ function getExitTime() {
                         do {
                             if (timbrature[i].direction === 'IN') {
                                 finePausaPranzo = timbrature[i].time;
-
+                                let diff = finePausaPranzo - inizioPausaPranzo;
                                 // Se ho sforato l'ora...
-                                if ((finePausaPranzo - inizioPausaPranzo) > 3600000) {
+                                if (diff > 3600000) {
+                                    messages.push({ icon: 'error', message: ressMoreThan1Hour.format(Math.floor(diff / 60000), Math.floor(nearestMultipleOf15(Math.floor((diff - 3600000) / 60000)))) });
+
                                     // Metto la pausa a 1 ora
                                     finePausaPranzo = new Date(inizioPausaPranzo.getTime());
-                                    finePausaPranzo.addHours(1);
-                                    //TO-DO, segnala anomalia
+                                    finePausaPranzo.setHours(finePausaPranzo.getHours() + 1);
                                 } else {
                                     finePausaPranzo = timbrature[i].time;
                                 }
@@ -95,6 +142,7 @@ function getExitTime() {
                             let differenza = startTime - maxIngresso;
                             rolTime = (differenza / (1000 * 60 * 60)) % 24;
                             rolTime = rolTime % 1 != 0 ? Math.floor(rolTime) + 1 : Math.floor(rolTime);
+                            messages.push({ icon: 'warn', message: resROL.format(rolTime) });
 
                             workHours -= rolTime;
                         }
@@ -104,13 +152,16 @@ function getExitTime() {
                         
                         // Se ho fatto meno di mezz'ora di pausa pranzo...
                         if (durataPausaPranzo < 1800000)
-                        {
+                        {                           
+                            messages.push({ icon: 'warn', message: resLessThan30Min.format(Math.floor(durataPausaPranzo / 60000)) }); 
                             //Imposto 30 minuti come durata
                             durataPausaPranzo = 1800000;
                         }
     
                         endTime.setMilliseconds(endTime.getMilliseconds() + durataPausaPranzo);
-                        return { date: endTime, lunchTimeMinutes: Math.floor(durataPausaPranzo / 60000), rol: rolTime, isEstimation: false };
+                        let lunchTimeMinutes = Math.floor(durataPausaPranzo / 60000);
+                        messages.push({ icon: 'info', message: resLunchBreak.format(lunchTimeMinutes) });
+                        return { date: endTime, lunchTimeMinutes: lunchTimeMinutes, rol: rolTime, isEstimation: false, messages };
                     }
                 }
     
@@ -121,6 +172,8 @@ function getExitTime() {
                     // Ho preso o devo prendere ROL
                     let differenza = startTime - maxIngresso;
                     rolTime = Math.round((differenza / (1000 * 60 * 60)) % 24);
+                    messages.push({ icon: 'warn', message: resROL.format(rolTime) });
+
                     workHours -= rolTime;
                 }
 
@@ -129,11 +182,12 @@ function getExitTime() {
                     //Calcola su mezz'ora di pausa
                     lunchTimeMinutes = 30;
                     endTime.setMinutes(endTime.getMinutes() + lunchTimeMinutes);
-                    return { date: endTime, lunchTimeMinutes: lunchTimeMinutes, rol: rolTime, isEstimation: true };
+                    messages.push({ icon: 'warn', message: resIsEstimation });
+                    return { date: endTime, lunchTimeMinutes: lunchTimeMinutes, rol: rolTime, isEstimation: true, messages };
                 }
             }
     
-            return { date: endTime, lunchTimeMinutes: lunchTimeMinutes, rol: rolTime, isEstimation: false };
+            return { date: endTime, lunchTimeMinutes: lunchTimeMinutes, rol: rolTime, isEstimation: false, messages };
         }
     }
 }
@@ -145,48 +199,16 @@ function showExitTime() {
 
         let res_remainingTime;
         let res_timeOfExit;
-        let res_timeOfExitTooltip1;
-        let res_timeOfExitTooltip1_1;
-        let res_timeOfExitTooltip1_2;
-        let res_timeOfExitTooltip1_3;
-        let res_timeOfExitTooltip2;
-        let res_timeOfExitTooltip3;
-        let res_timeOfExitTooltip4;
-        let res_timeOfExitTooltip5;
-        let res_timeOfExitTooltip6;
-
 
         if (document.querySelector(`[id$='_Visualizzazionetimbrature_11_portlet_title_lbl_title_openclosetbl']`).innerText === 'Visualizzazione timbrature') {
             res_remainingTime = 'Tempo residuo';
             res_timeOfExit = 'Orario di uscita';
-            res_timeOfExitTooltip1 = 'Calcolato';
-            res_timeOfExitTooltip1_1 = 'su';
-            res_timeOfExitTooltip1_2 = 'senza';
-            res_timeOfExitTooltip1_3 = 'minuti di';
-            res_timeOfExitTooltip2 = 'pausa pranzo';
-            res_timeOfExitTooltip3 = 'e su';
-            res_timeOfExitTooltip4 = 'ora';
-            res_timeOfExitTooltip5 = 'ore';
-            res_timeOfExitTooltip6 = 'di ROL';
 
         } else {
             res_remainingTime = 'Remaining time';
             res_timeOfExit = 'Time of exit';
-            res_timeOfExitTooltip1 = 'Calculated';
-            res_timeOfExitTooltip1_1 = 'on';
-            res_timeOfExitTooltip1_2 = 'without';
-            res_timeOfExitTooltip1_3 = 'minutes of';
-            res_timeOfExitTooltip2 = 'lunch break';
-            res_timeOfExitTooltip3 = 'and on';
-            res_timeOfExitTooltip4 = 'hour';
-            res_timeOfExitTooltip5 = 'hours';
-            res_timeOfExitTooltip6 = 'of ROL';
         }
 
-        let lunchBreakMessage = `${exitTime.lunchTimeMinutes > 0 ? `${res_timeOfExitTooltip1_1} ${exitTime.lunchTimeMinutes} ${res_timeOfExitTooltip1_3}` : res_timeOfExitTooltip1_2 }`;
-        let rolMessage = ` ${res_timeOfExitTooltip3} ${exitTime.rol} ${exitTime.rol == 1 ? res_timeOfExitTooltip4 : res_timeOfExitTooltip5} ${res_timeOfExitTooltip6}`;
-        let tooltipMessage = `${res_timeOfExitTooltip1} ${lunchBreakMessage} ${res_timeOfExitTooltip2}${exitTime.rol > 0 ? rolMessage : ''}.`;
-        
         const template = document.createElement("template");
         template.innerHTML = 
             `<style>
@@ -213,7 +235,12 @@ function showExitTime() {
                     justify-content: center;
                     align-items: start;
                     flex-direction: column;
-                    margin: 0 0 0 30px;
+                    padding: 0 0 0 30px;
+                 }
+
+                 .x-flex-item.single {
+                    align-items: center;
+                    margin: 0;
                  }
  
                  .x-title {
@@ -228,60 +255,115 @@ function showExitTime() {
                      align-items: center;
                  }
 
-                 .x-circle {
-                    margin: 0 4px;
-                    border-radius: 25px;
-                    width: 7px;
-                    height: 7px;
-                    background: #20bb51;
+                 .x-messages {
+                    margin: 0px 0px 5px 0px;
                  }
 
-                 .x-warning {
+                 .x-message {
+                    display: flex;
+                    align-items: center;
+                    padding: 5px;
+                    border-bottom: 1px solid #e3e3e3;
+                    font-size: 13px;
+                    font-family: 'Segoe UI', 'Proxima Nova';
+                    font-weight: 600;
+                    color: #5d5d5d;
+                 }
+
+                 .x-icon {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50px;
+                    margin-right: 5px;
+                 }
+
+                 .x-warn {
                     background: #FFA500;
+                 }
+
+                 .x-info {
+                    background: #35c464;
+                    font-weight: normal;
+                    font-size: 13px;
+                 }
+
+                 .x-error {
+                    background: #e64c4c;
                  }
              </style>
              <div class="x-flex">
-                 <div class="x-flex-item" style="flex: 33%; border-right: 1px solid #e3e3e3;" title="${tooltipMessage}">
+                 <div class="x-flex-item ${exitTime.isEstimation ? 'single' : ''}" style="flex: 33%;">
                      <div class="x-title">
                         <span>${res_timeOfExit}</span>
-                        <div class="x-circle ${exitTime.isEstimation ? "x-warning" : "" }"></div>
                      </div>
                      <div>
                          <span class="x-lg-text x-bold">${String(exitTime.date.getHours()).padStart(2, "0")}</span>
                          <span class="x-lg-text">:${String(exitTime.date.getMinutes()).padStart(2, "0")}</span>
+                         ${renderEstimatedTo(exitTime.isEstimation, exitTime.date)}
                      </div>
                  </div>
-                 <div class="x-flex-item" style="flex: 66%;">
-                     <div class="x-title">${res_remainingTime}</div>
-                     <div style="width: 100%;">
-                         <span class="x-lg-text" id="x-countdown"></span>
-                     </div>
-                 </div>
-             </div><hr style="border: 1px solid #e3e3e3; margin: 18px;">`;
+                 ${renderCountdown(!exitTime.isEstimation, res_remainingTime)}
+             </div>
+             <div class="x-messages">
+                ${renderMessages(exitTime.messages)}
+             </div>`;
         const node = template.content.cloneNode(true);
         document.querySelector('[ps-resource-name="Visualizzazionetimbrature_11"]').prepend(node);
 
-        var countDownDate = exitTime.date;
+        if (!exitTime.isEstimation) {
+            var countDownDate = exitTime.date;
 
-        var x = setInterval(function() {
-            var now = new Date().getTime();
-            var distance = countDownDate - now;
-
-            var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            var seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-            if (distance < 0) {
-                clearInterval(x);
-                hours = 0;
-                minutes = 0;
-                seconds = 0;
-            }
-
-            document.getElementById("x-countdown").innerHTML = 
-                `<span class="x-bold">${hours}h </span><span>${minutes}m </span><span class="x-md-text">${seconds}s</span>`;
-        }, 1000);
+            var x = setInterval(function() {
+                var now = new Date().getTime();
+                var distance = countDownDate - now;
+    
+                var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+    
+                if (distance < 0) {
+                    clearInterval(x);
+                    hours = 0;
+                    minutes = 0;
+                    seconds = 0;
+                }
+    
+                document.getElementById("x-countdown").innerHTML = 
+                    `<span class="x-bold">${hours}h </span><span>${minutes}m </span><span class="x-md-text">${seconds}s</span>`;
+            }, 1000);
+        }
     }
+}
+
+function renderCountdown(render, res_remainingTime) {
+    return render ? `<div class="x-flex-item" style="flex: 66%; border-left: 1px solid #e3e3e3;">
+            <div class="x-title">${res_remainingTime}</div>
+            <div style="width: 100%;">
+                <span class="x-lg-text" id="x-countdown"></span>
+            </div>
+        </div>` : ``;
+
+}
+
+function renderEstimatedTo(isEstimation, date) {
+    if (isEstimation) {
+        date.setMinutes(date.getMinutes() + 30);
+        return `<span class="x-lg-text"> - </span>
+        <span class="x-lg-text x-bold">${String(date.getHours()).padStart(2, "0")}</span>
+        <span class="x-lg-text">:${String(date.getMinutes()).padStart(2, "0")}</span>`
+    }
+
+    return ``;
+}
+
+function renderMessages(messages) {
+    let html = '';
+
+    messages.forEach(x => {
+        html += `<div class="x-message"><div><div class="x-icon x-${x.icon}"></div></div><div><span>${x.message}</span></div></div>`
+    });
+
+    return html;
 }
 
 showExitTime();
