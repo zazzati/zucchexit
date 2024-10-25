@@ -7,10 +7,10 @@
     "content_scripts": [{
         "all_frames": true,
         "js": [ "content.js" ],
-        "matches": [ "https://saas.hrzucchetti.it/*/*" ]
+        "matches": [ "https://saas.hrzucchetti.it/*/jsp/home.jsp*" ]
     }],
     "manifest_version": 3,
     "name": "Zucchexit",
     "description": "Show the end of working time on Infinity Zucchetti.",
-    "version": "1.3.0"
+    "version": "1.4.0"
 }
