@@ -369,8 +369,10 @@ function updateCountdown(countDownDate) {
         seconds = 0;
     }
 
-    document.getElementById("x-countdown").innerHTML = 
-        `<span class="x-bold">${hours}h </span><span>${minutes}m </span>`;
+    let countdown = hours > 0 ? `<span class="x-bold">${hours}h </span><span>${minutes}m</span>` :
+        `<span class="x-bold">${minutes}h </span><span>${seconds}s</span>`;
+
+    document.getElementById("x-countdown").innerHTML = countdown;
 }
 
 function renderCountdown(render, res_remainingTime) {
