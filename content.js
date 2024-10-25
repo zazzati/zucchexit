@@ -307,11 +307,12 @@ function showExitTime() {
                  }
 
                  .x-countdown-container {
-                    width: 100%;
+                    width: 80%;
                     flex-grow: 1;
                     align-items: center;
-                    justify-content: center;
+                    justify-content: start;
                     display: flex;
+                    margin: 0px 0px 0px 10px;
                  }
              </style>
              <div id="Zucchexit_container" ps-resource-name="Zucchexit" style="margin-bottom: 15px; inset: 306px 250px 346px 0px;" class="resource_container">
