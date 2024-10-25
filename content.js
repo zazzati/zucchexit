@@ -1,15 +1,3 @@
-if (!String.prototype.format) {
-    String.prototype.format = function() {
-      var args = arguments;
-      return this.replace(/{(\d+)}/g, function(match, number) { 
-        return typeof args[number] != 'undefined'
-          ? args[number]
-          : match
-        ;
-      });
-    };
-  }
-
 function nearestMultipleOf15(num) {
     // Calcola il multiplo di 15 più vicino
     let lowerMultiple = Math.floor(num / 15) * 15;
@@ -25,10 +13,10 @@ function nearestMultipleOf15(num) {
 
 function getExitTime() {
     let messages = [];
-    let mainTable = document.querySelector(`table[id$='_grid_timbrus']`);
+    let mainTable = frame.querySelector(`table[id$='_grid_timbrus']`);
 
     if (mainTable) {
-        let isItalian = document.querySelector(`[id$='_Visualizzazionetimbrature_11_portlet_title_lbl_title_openclosetbl']`).innerText === 'Visualizzazione timbrature';
+        let isItalian = frame.querySelector(`[id$='_Visualizzazionetimbrature_11_portlet_title_lbl_title_openclosetbl']`).innerText === 'Visualizzazione timbrature';
 
         let resLessThan30Min = isItalian ? 'Hai fatto {0} minuti di pausa pranzo.' : `You had a {0} minutes lunch break.`;
         let ressMoreThan1Hour = isItalian ? 'Hai fatto {0} minuti di pausa pranzo! Orario di uscita calcolato su 60 minuti di pausa ma saranno conteggiati {1} minuti di minor presenza.' :
@@ -41,15 +29,16 @@ function getExitTime() {
             `The final time of exit will be shown after the lunch break.`
         let resBefore730 = isItalian ? `L'orario di ingresso usato per il calcolo è 7:30.` :
             `The time of entry used for the calculation is 7:30.`;
+        let resAfter14 = isItalian ? `Sei tornato da pausa pranzo dopo le 14:00, dovrai prendere ROL!` : `You've exceeded the end of the lunch break (14:00), take a ROL!`;
         var timbrature = Array.from(mainTable.querySelectorAll('tbody>tr[lookupcells="1"]')).map((x) => { 
             var time = x.querySelectorAll(':nth-child(3)')[0].innerText;
             var date = new Date();
             date.setHours(time.substring(0, 2),time.substring(3),0,0)
             
             return {
-            direction: x.querySelectorAll('.blue').length ? 'IN' : 'OUT',
-            time: date
-        }});
+                direction: x.querySelectorAll('.blue').length ? 'IN' : 'OUT',
+                time: date 
+            }});
     
         if (timbrature && timbrature.length) {
             let i = 0;
@@ -64,6 +53,9 @@ function getExitTime() {
 
             let pausaStart = new Date();
             pausaStart.setHours(12, 0, 0, 0);
+
+            let pausaEnd = new Date();
+            pausaEnd.setHours(14, 0, 0, 0);
 
             let maxIngresso = new Date();
             maxIngresso.setHours(10, 0, 0, 0);
@@ -113,6 +105,11 @@ function getExitTime() {
                         do {
                             if (timbrature[i].direction === 'IN') {
                                 finePausaPranzo = timbrature[i].time;
+
+                                if (finePausaPranzo > pausaEnd) {
+                                    messages.push({ icon: 'error', message: resAfter14 });
+                                }
+
                                 let diff = finePausaPranzo - inizioPausaPranzo;
                                 // Se ho sforato l'ora...
                                 if (diff > 3600000) {
@@ -200,7 +197,7 @@ function showExitTime() {
         let res_remainingTime;
         let res_timeOfExit;
 
-        if (document.querySelector(`[id$='_Visualizzazionetimbrature_11_portlet_title_lbl_title_openclosetbl']`).innerText === 'Visualizzazione timbrature') {
+        if (frame.querySelector(`[id$='_Visualizzazionetimbrature_11_portlet_title_lbl_title_openclosetbl']`).innerText === 'Visualizzazione timbrature') {
             res_remainingTime = 'Tempo residuo';
             res_timeOfExit = 'Orario di uscita';
 
@@ -213,13 +210,16 @@ function showExitTime() {
         template.innerHTML = 
             `<style>
                  .x-lg-text {
-                     font-size: 40px;
-                     font-family: Proxima Nova !important;
-                     color: #343434;
+                     font-size: 40px;         
                  }
  
                  .x-md-text {
-                     font-size: 28px;
+                     font-size: 32px;
+                 }
+
+                 .x-lg-text, .x-md-text {
+                    font-family: Proxima Nova !important;
+                    color: #343434;
                  }
  
                  .x-bold {
@@ -228,6 +228,7 @@ function showExitTime() {
  
                  .x-flex {
                      display: flex;
+                     justify-content: center;
                  }
  
                  .x-flex-item {
@@ -235,7 +236,8 @@ function showExitTime() {
                     justify-content: center;
                     align-items: start;
                     flex-direction: column;
-                    padding: 0 0 0 30px;
+                    flex: 50%;
+                    align-items: center;
                  }
 
                  .x-flex-item.single {
@@ -260,14 +262,17 @@ function showExitTime() {
                  }
 
                  .x-message {
-                    display: flex;
-                    align-items: center;
-                    padding: 5px;
+                    padding: 4px;
                     border-bottom: 1px solid #e3e3e3;
+                    font-family: Proxima Nova;
+                    font-weight: 300;
                     font-size: 13px;
-                    font-family: 'Segoe UI', 'Proxima Nova';
-                    font-weight: 600;
-                    color: #5d5d5d;
+                    color: #222;
+                    text-align: left;
+                 }
+
+                 .x-message:last-child {
+                    border-bottom: none;
                  }
 
                  .x-icon {
@@ -275,6 +280,7 @@ function showExitTime() {
                     height: 8px;
                     border-radius: 50px;
                     margin-right: 5px;
+                    display: inline-block;
                  }
 
                  .x-warn {
@@ -290,56 +296,88 @@ function showExitTime() {
                  .x-error {
                     background: #e64c4c;
                  }
+
+                 .x-countdown-container {
+                    width: 100%;
+                    flex-grow: 1;
+                    align-items: center;
+                    justify-content: center;
+                    display: flex;
+                 }
              </style>
-             <div class="x-flex">
-                 <div class="x-flex-item ${exitTime.isEstimation ? 'single' : ''}" style="flex: 33%;">
-                     <div class="x-title">
-                        <span>${res_timeOfExit}</span>
-                     </div>
-                     <div>
-                         <span class="x-lg-text x-bold">${String(exitTime.date.getHours()).padStart(2, "0")}</span>
-                         <span class="x-lg-text">:${String(exitTime.date.getMinutes()).padStart(2, "0")}</span>
-                         ${renderEstimatedTo(exitTime.isEstimation, exitTime.date)}
+             <div id="Zucchexit_container" ps-resource-name="Zucchexit" style="margin-bottom: 15px; inset: 306px 250px 346px 0px;" class="resource_container">
+
+             <div id="Zucchexit_title" style="overflow: visible; display: block;">
+                 <div id="Zucchexit_portlet_title_container" class="gsmd_gadget_decorator_container">
+                     <div id="Zucchexit_portlet_title" portlet_id="Zucchexit_portlet_title" align="left" class="gsmd_gadget_decorator_portlet portlet gadgetDecoratorTitle" style="opacity: 1; transition: opacity 0.2s ease-out; height: 34px;">
+                         <span id="Zucchexit_portlet_title_lbl_title" formid="Zucchexit_portlet_title" ps-name="lbl_title" class="title hookable_item lbl_title_ctrl" style="display: none; cursor: move; top: 0px;">
+                             <div id="Zucchexit_portlet_title_lbl_titletbl" style="width:100%;">Zucchexit</div>
+                         </span>
+                         <span id="Zucchexit_portlet_title_lbl_title_openclose" formid="Zucchexit_portlet_title" ps-name="lbl_title_openclose" class="title lbl_title_openclose_ctrl" style="display: block; cursor: default; top: 0px;">
+                             <div id="Zucchexit_portlet_title_lbl_title_openclosetbl" style="width:100%;">Zucchexit</div>
+                         </span>
                      </div>
                  </div>
-                 ${renderCountdown(!exitTime.isEstimation, res_remainingTime)}
              </div>
-             <div class="x-messages">
-                ${renderMessages(exitTime.messages)}
-             </div>`;
+           
+             <div class="column_cb">
+                <div class="x-flex">
+                    <div class="x-flex-item ${exitTime.isEstimation ? 'single' : ''}">
+                        <div class="x-title">
+                            <span>${res_timeOfExit}</span>
+                        </div>
+                        <div>
+                            <span class="x-lg-text x-bold">${String(exitTime.date.getHours()).padStart(2, "0")}</span>
+                            <span class="x-lg-text">:${String(exitTime.date.getMinutes()).padStart(2, "0")}</span>
+                            ${renderEstimatedTo(exitTime.isEstimation, exitTime.date)}
+                        </div>
+                    </div>
+                    ${renderCountdown(!exitTime.isEstimation, res_remainingTime)}
+                </div>
+                <div class="x-messages">
+                    ${renderMessages(exitTime.messages)}
+                </div>          
+            </div>
+            </div>`;
         const node = template.content.cloneNode(true);
-        document.querySelector('[ps-resource-name="Visualizzazionetimbrature_11"]').prepend(node);
+        document.querySelector(`div[id$='_ColumnA_container']`).appendChild(node);
 
         if (!exitTime.isEstimation) {
             var countDownDate = exitTime.date;
+            updateCountdown(countDownDate);
 
-            var x = setInterval(function() {
-                var now = new Date().getTime();
-                var distance = countDownDate - now;
-    
-                var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                var seconds = Math.floor((distance % (1000 * 60)) / 1000);
-    
-                if (distance < 0) {
-                    clearInterval(x);
-                    hours = 0;
-                    minutes = 0;
-                    seconds = 0;
-                }
-    
-                document.getElementById("x-countdown").innerHTML = 
-                    `<span class="x-bold">${hours}h </span><span>${minutes}m </span><span class="x-md-text">${seconds}s</span>`;
+            this.zCountdown = setInterval(function() {
+                updateCountdown(countDownDate);
             }, 1000);
         }
     }
 }
 
+
+function updateCountdown(countDownDate) {
+    var now = new Date().getTime();
+    var distance = countDownDate - now;
+
+    var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+    var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+    if (distance < 0) {
+        clearInterval(this.zCountdown);
+        hours = 0;
+        minutes = 0;
+        seconds = 0;
+    }
+
+    document.getElementById("x-countdown").innerHTML = 
+        `<span class="x-bold">${hours}h </span><span>${minutes}m </span>`;
+}
+
 function renderCountdown(render, res_remainingTime) {
-    return render ? `<div class="x-flex-item" style="flex: 66%; border-left: 1px solid #e3e3e3;">
+    return render ? `<div class="x-flex-item" style="border-left: 1px solid #e3e3e3;">
             <div class="x-title">${res_remainingTime}</div>
-            <div style="width: 100%;">
-                <span class="x-lg-text" id="x-countdown"></span>
+            <div class="x-countdown-container">
+                <span class="x-md-text" id="x-countdown"></span>
             </div>
         </div>` : ``;
 
@@ -348,7 +386,7 @@ function renderCountdown(render, res_remainingTime) {
 function renderEstimatedTo(isEstimation, date) {
     if (isEstimation) {
         date.setMinutes(date.getMinutes() + 30);
-        return `<span class="x-lg-text"> - </span>
+        return `<span class="x-lg-text">&nbsp;-&nbsp;</span>
         <span class="x-lg-text x-bold">${String(date.getHours()).padStart(2, "0")}</span>
         <span class="x-lg-text">:${String(date.getMinutes()).padStart(2, "0")}</span>`
     }
@@ -360,10 +398,24 @@ function renderMessages(messages) {
     let html = '';
 
     messages.forEach(x => {
-        html += `<div class="x-message"><div><div class="x-icon x-${x.icon}"></div></div><div><span>${x.message}</span></div></div>`
+        html += `<div class="x-message"><span class="x-icon x-${x.icon}"></span>${x.message}</div>`;
     });
 
     return html;
 }
 
-showExitTime();
+if (!String.prototype.format) {
+    String.prototype.format = function() {
+      var args = arguments;
+      return this.replace(/{(\d+)}/g, function(match, number) { 
+        return typeof args[number] != 'undefined'
+          ? args[number]
+          : match
+        ;
+      });
+    };
+  }
+
+let frameElement = document.querySelector(`[name="Main"]`);
+let frame = frameElement.contentWindow.document;
+frameElement.onload = function() { showExitTime(); };
