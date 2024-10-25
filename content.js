@@ -214,7 +214,16 @@ function showExitTime() {
                  }
  
                  .x-md-text {
-                     font-size: 32px;
+                     font-size: 25px;
+                 }
+
+                 .x-md-text > span {
+                    text-align:left;
+                    display: inline-block;
+                 }
+
+                 .x-md-text > .x-bold {
+                    margin-right: 5px;
                  }
 
                  .x-lg-text, .x-md-text {
@@ -370,7 +379,7 @@ function updateCountdown(countDownDate) {
     }
 
     let countdown = hours > 0 ? `<span class="x-bold">${hours}h </span><span>${minutes}m</span>` :
-        `<span class="x-bold">${minutes}h </span><span>${seconds}s</span>`;
+        `<span class="x-bold">${minutes}m </span><span>${seconds}s</span>`;
 
     document.getElementById("x-countdown").innerHTML = countdown;
 }
